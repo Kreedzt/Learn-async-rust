@@ -1,0 +1,11 @@
+* 起始
+** futures 包
+   - 使用 ~block_on~ 阻塞:
+     #+begin_src rust
+       use futures::executor::block_on;
+     #+end_src
+
+   - 使用 ~join!~ 等待:
+     #+begin_src rust
+       futures::join!(f1, f2);
+     #+end_src
