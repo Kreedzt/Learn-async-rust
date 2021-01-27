@@ -1,3 +1,4 @@
 # inline_style = "Block"
 fn_single_line = true
+# 以下特性暂时在 stable 不生效
 blank_lines_upper_bound = 2
