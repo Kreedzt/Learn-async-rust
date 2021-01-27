@@ -86,9 +86,83 @@
 
 *** 构建一个计时器
     当 timer 被构造时, 创建一个线程, 睡眠指定的时间, 通过发送 future 信号通知流逝的时间
-
 ** 构建一个执行器
    Future 运行为惰性的: 只有在 async 函数中使用 ~.await~ 才可以顺序执行, 谁会为
    顶层的 ~async~ 函数运行和返回 future ? 需要一个 ~Future~ 执行器来进行此操作.
+** 执行器与系统 IO
+   在 socket 上异步读(demo):
 
-   
+   #+begin_src rust
+     pub struct SocketRead<'a> {
+         socket: &'a Socket,
+     }
+
+     impl SimpleFuture for SocketRead<'_> {
+         type Output = Vec<u8>;
+
+         fn poll(&mut self, wake: fn()) -> Poll<Self::Output> {
+             if self.socket.has_data_to_read() {
+                 Poll::Ready(self.socket.read_buf())
+             } else {
+                 self.socket.set_readable_callback(wake);
+                 Poll::Pending
+             }
+         }
+     }
+   #+end_src
+
+   系统 IO(demo):
+   #+begin_src rust
+     struct IoBlocker {
+         //
+     }
+
+     struct Event {
+         id: usize,
+         signals: Signals
+     }
+
+     impl IoBlocker {
+         fn new() -> Self { /* ... */ }
+
+         fn add_io_event_interest(
+             &self,
+             io_object: &IoObject,
+             event: Event,
+         ) { /* ... */ }
+
+         fn block(&self) -> Event { /* ... */ }
+     }
+
+     let mut io_blocker = IoBlocker::new();
+     io_blocker.add_io_event_interest(
+         &socket_1,
+         Event { id: 1, signals: READABLE },
+     );
+
+     io_blocker.add_io_event_interest(
+         &socket_2,
+         Event { id: 2, signals: READABLE | WRITABLE },
+     );
+
+     let event = io_blocker.block();
+
+     println!("Socket {:?} is now {:?}", event.id, event.signals);
+   #+end_src
+
+   TODO: 事件循环?
+   #+begin_src rust
+     impl Socket {
+         fn set_readable_callback(&self, waker: Waker) {
+             let local_executor = self.local_executor;
+
+             let id = self.id;
+
+             local_executor.event_map.insert(id, waker);
+             local_executor.add_io_event_interest(
+                 &self.socket_file_descriptor,
+                 Event { id, signals: READABLE },
+             );
+         }
+     }
+   #+end_src
